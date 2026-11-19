@@ -365,6 +365,40 @@ h2 {
   background: #e9edf8;
   color: #435889;
 }
+[data-record-color="blue"] {
+  --record-tint: #e4effd;
+  --record-ink: #214777;
+  --record-accent: #496eaa;
+}
+[data-record-color="green"] {
+  --record-tint: #e6f5ed;
+  --record-ink: #245442;
+  --record-accent: #44806a;
+}
+[data-record-color="amber"] {
+  --record-tint: #fff0dc;
+  --record-ink: #704316;
+  --record-accent: #a66834;
+}
+[data-record-color="rose"] {
+  --record-tint: #fae8ee;
+  --record-ink: #763749;
+  --record-accent: #a85470;
+}
+[data-record-color="purple"] {
+  --record-tint: #f1eafa;
+  --record-ink: #462b69;
+  --record-accent: #7c58a5;
+}
+.entry[data-record-color] {
+  background: var(--record-tint);
+  color: var(--record-ink);
+}
+.entry[data-record-color],
+.detail-item[data-record-color],
+.today-item[data-record-color] {
+  box-shadow: inset 3px 0 var(--record-accent);
+}
 .due {
   font-size: 9px;
   border-radius: 3px;

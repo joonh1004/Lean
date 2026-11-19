@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { validateDraft } from "./records";
+import { RECORD_COLORS, recordColor } from "./recordColors";
 export default function RecordEditor({
   record,
   type,
@@ -148,6 +149,21 @@ export default function RecordEditor({
               {errors[optional]}
             </p>
           )}
+        </div>
+        <div className="field color-field">
+          <label htmlFor="record-color">색상 (선택)</label>
+          <select
+            id="record-color"
+            value={recordColor(draft.color) ?? ""}
+            onChange={(e) => set("color", e.target.value || null)}
+          >
+            <option value="">기본</option>
+            {RECORD_COLORS.map(([value, name]) => (
+              <option key={value} value={value}>
+                {name}
+              </option>
+            ))}
+          </select>
         </div>
         {task && draft.dueDate && draft.date > draft.dueDate && (
           <p className="date-warning" role="status">

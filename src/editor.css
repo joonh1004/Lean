@@ -29,7 +29,8 @@
   margin-bottom: 6px;
   font-weight: 600;
 }
-.record-editor input {
+.record-editor input,
+.record-editor .color-field select {
   display: block;
   width: 100%;
   height: 44px;
@@ -41,6 +42,9 @@
   font: inherit;
   font-size: 14px;
   min-width: 0;
+}
+.record-editor .color-field {
+  margin-top: 16px;
 }
 .record-editor input[aria-invalid="true"] {
   border-color: #a23b50;
@@ -176,7 +180,8 @@
 .detail-item .edit-entry {
   margin-left: auto;
 }
-.record-editor input:focus-visible {
+.record-editor input:focus-visible,
+.record-editor .color-field select:focus-visible {
   outline: 3px solid #3868ad;
   outline-offset: 1px;
 }

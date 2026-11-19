@@ -1,4 +1,5 @@
 import { folderPath } from "./repository.js";
+import { recordColor } from "./recordColors.js";
 export const RECORDS_KEY = "joonh.workspace.records.v1";
 export function validHttpUrl(value) {
   if (
@@ -77,6 +78,8 @@ export function createRecord(
   };
   if (draft.type === "note") return { ...common, body: draft.body };
   if (draft.type === "link") return { ...common, url: draft.url };
+  const color = recordColor(draft.color);
+  if (color) common.color = color;
   return draft.type === "task"
     ? { ...common, done: false, dueDate: draft.dueDate ?? null }
     : { ...common, time: draft.time ?? null };

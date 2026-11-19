@@ -144,3 +144,67 @@ test("record edits preserve independent deadline and stable future links", async
   assert.equal(original.date, "2026-11-15");
   assert.throws(() => mod.updateRecord(store, "t1", { type: "event" }));
 });
+
+test("calendar records round-trip preset colors and reset without changing legacy data", async () => {
+  const { createRecord, updateRecord, saveRecords, loadRecords, RECORDS_KEY } =
+    await import("../src/records.js");
+  const task = {
+    type: "task",
+    title: "샘플 할 일",
+    date: "2026-11-15",
+    dueDate: "2026-11-16",
+  };
+  const event = {
+    type: "event",
+    title: "샘플 일정",
+    date: "2026-11-15",
+    time: "16:30",
+  };
+  const legacy = createRecord(task, "legacy", "created");
+  assert.equal(Object.hasOwn(legacy, "color"), false);
+  const coloredTask = createRecord(
+    { ...task, color: "blue" },
+    "task",
+    "created",
+  );
+  const coloredEvent = createRecord(
+    { ...event, color: "purple" },
+    "event",
+    "created",
+  );
+  const storage = new Map();
+  storage.getItem = (key) => storage.get(key) ?? null;
+  storage.setItem = (key, value) => storage.set(key, value);
+  const initial = { version: 1, records: [legacy, coloredTask, coloredEvent] };
+  saveRecords(storage, initial);
+  assert.deepEqual([...storage.keys()], [RECORDS_KEY]);
+  const loaded = loadRecords(storage);
+  assert.deepEqual(loaded.records, [
+    legacy,
+    { ...coloredTask, color: "blue" },
+    { ...coloredEvent, color: "purple" },
+  ]);
+  const edited = updateRecord(loaded, "task", { done: true }, "done");
+  assert.equal(edited.records[1].color, "blue");
+  const reset = updateRecord(edited, "task", { color: null }, "reset");
+  saveRecords(storage, reset);
+  assert.deepEqual(loadRecords(storage).records, [
+    legacy,
+    { ...coloredTask, color: null, done: true, updatedAt: "reset" },
+    coloredEvent,
+  ]);
+});
+
+test("only calendar records accept a known preset on creation", async () => {
+  const { createRecord } = await import("../src/records.js");
+  const task = { type: "task", title: "샘플", date: "2026-11-15" };
+  const note = { type: "note", title: "샘플", body: "메모" };
+  assert.equal(
+    createRecord({ ...task, color: "constructor" }, "task", "now").color,
+    undefined,
+  );
+  assert.equal(
+    createRecord({ ...note, color: "blue" }, "note", "now").color,
+    undefined,
+  );
+});

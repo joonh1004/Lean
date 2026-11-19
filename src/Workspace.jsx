@@ -1,6 +1,7 @@
 import QuoteLibrary from "./QuoteLibrary";
 import React, { useState, useRef, useEffect } from "react";
 import { dateKey, monthDays } from "./calendar";
+import { recordColor } from "./recordColors";
 import {
   createRecord,
   updateRecord,
@@ -191,6 +192,7 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
     return (
       <div
         className={`${context === "detail" ? "detail-item" : "today-item"} ${item.done ? "done" : ""}`}
+        data-record-color={recordColor(item.color)}
         key={item.id}
       >
         {item.type === "task" ? (
@@ -478,6 +480,7 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
                         <span
                           key={item.id}
                           className={`entry ${item.done ? "done" : ""} tone-${item.subject}`}
+                          data-record-color={recordColor(item.color)}
                           title={item.title}
                         >
                           <span className="entry-mark">
