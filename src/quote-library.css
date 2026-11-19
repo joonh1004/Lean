@@ -1,0 +1,105 @@
+.quote-library {
+  max-width: 960px;
+  margin: 8px auto;
+  width: 100%;
+}
+.quote-library header,
+.quote-library header > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.quote-library h1 {
+  font-size: 24px;
+  margin: 0 0 24px;
+}
+.quote-library header button {
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+.quote-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+.quote-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #e4eaf3;
+  border-radius: 20px;
+  padding: 16px;
+  min-width: 0;
+}
+.quote-row p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.quote-row button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f0f3fa;
+}
+.quote-manager-stage {
+  min-height: 100vh;
+  padding: 48px;
+}
+.record-editor textarea#quote-copy {
+  display: block;
+  width: 100%;
+  min-height: 144px;
+  max-height: 320px;
+  resize: vertical;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #c6d0df;
+  border-radius: 12px;
+  background: #f7faff;
+  color: #243247;
+  font: inherit;
+  font-size: 16px;
+  line-height: 26px;
+}
+.record-editor textarea#quote-copy:focus-visible {
+  outline: 3px solid #3868ad;
+  outline-offset: 1px;
+}
+.quote-panel .manage-quotes {
+  display: block;
+  margin: 24px 0 0 auto;
+  min-height: 44px;
+  padding: 8px 0;
+  background: transparent;
+  color: #526984;
+  font-size: 13px;
+}
+.quote-library .quote-notice {
+  font-size: 13px;
+  line-height: 22px;
+  color: #64748b;
+}
+.quote-delete-copy {
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 22px;
+}
