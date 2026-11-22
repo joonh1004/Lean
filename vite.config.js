@@ -3,6 +3,7 @@ import { parse } from 'dotenv';
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import workspaceDashboard from './tools/workspace-dashboard.js';
 import { syncConfig } from './src/syncProtocol.js';
 
 const writer = fileURLToPath(new URL('./tools/export_problem_hwpx.py', import.meta.url));
@@ -94,11 +95,17 @@ function publicSync(mode) {
   };
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command, isPreview }) => {
   return {
     envPrefix: [],
-    server: { host: '127.0.0.1' },
+    // A static build must not contain the monitor client, even if NODE_ENV is overridden.
+    define: { __LEAN_LOCAL_DASHBOARD__: JSON.stringify(command === 'serve' && !isPreview) },
+    server: {
+      host: '127.0.0.1',
+      // Do not let workspace-root discovery make adjacent applications readable.
+      fs: { allow: [fileURLToPath(new URL('.', import.meta.url))] },
+    },
     preview: { host: '127.0.0.1' },
-    plugins: [publicSync(mode), localHwpx(process.env.LEAN_HWPX_PYTHON)],
+    plugins: [publicSync(mode), localHwpx(process.env.LEAN_HWPX_PYTHON), workspaceDashboard()],
   };
 });

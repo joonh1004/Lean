@@ -1,4 +1,5 @@
 import QuoteLibrary from "./QuoteLibrary";
+import WorkspaceDashboard from "./WorkspaceDashboard";
 import React, { useState, useRef, useEffect } from "react";
 import { dateKey, monthDays } from "./calendar";
 import { recordColor } from "./recordColors";
@@ -340,6 +341,16 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
           >
             명언
           </button>
+          <button
+            className={view === "dashboard" ? "nav-current" : "nav-item"}
+            aria-current={view === "dashboard" ? "page" : undefined}
+            onClick={() => {
+              setDetail(false);
+              setView("dashboard");
+            }}
+          >
+            작업 대시보드
+          </button>
         </nav>
         <div className="sidebar-bottom">
           <div className="avatar">J</div>
@@ -359,6 +370,8 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
         )}
         {view === "quotes" ? (
           <QuoteLibrary />
+        ) : view === "dashboard" ? (
+          <WorkspaceDashboard />
         ) : view === "today" ? (
           <section className="today-view" aria-labelledby="today-heading">
             <header className="today-header">
