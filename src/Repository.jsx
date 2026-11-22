@@ -12,7 +12,9 @@ import {
 } from "./repository";
 import { createRecord, updateRecord, deleteRecord } from "./records";
 import "./repository.css";
+import ProblemBank from "./ProblemBank.jsx";
 export default function Repository({ store, commit, initialSelection = null }) {
+  const [bankOpen, setBankOpen] = useState(false);
   const folders = store.folders || [],
     resources = store.records.filter((r) => ["note", "link"].includes(r.type));
   const [folder, setFolder] = useState("all"),
@@ -241,6 +243,10 @@ export default function Repository({ store, commit, initialSelection = null }) {
           저장소
         </h1>
         <div>
+          <button aria-pressed={bankOpen} onClick={() => setBankOpen(!bankOpen)}>
+            문제은행
+          </button>
+          {!bankOpen && <>
           <button
             onClick={() =>
               setModal({
@@ -257,8 +263,10 @@ export default function Repository({ store, commit, initialSelection = null }) {
           >
             기록 추가
           </button>
+          </>}
         </div>
       </header>
+      {bankOpen ? <ProblemBank /> : <>
       <div className="repository-surface">
         <nav className="folder-pane" aria-label="폴더 탐색">
           <h2>폴더</h2>
@@ -395,6 +403,7 @@ export default function Repository({ store, commit, initialSelection = null }) {
           )}
         </Modal>
       )}
+      </>}
     </section>
   );
 }
