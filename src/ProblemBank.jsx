@@ -200,7 +200,7 @@ export default function ProblemBank() {
   return <section className="problem-bank" aria-labelledby="problem-bank-heading">
     <h2 id="problem-bank-heading">문제은행</h2>
     <p>문제 이미지를 가져와 여백과 표식을 정리하고 과목별로 저장하세요. 원본은 그대로 보관해요.</p>
-    <p className="pb-note">{provider.name} 실시간 연동 미설정 · 이미지 편집은 이 브라우저에서만 수행해요.</p>
+    <p className="pb-note">{provider.name} 실시간 연동 미설정 · 이미지 편집과 HWPX 변환은 로컬에서만 수행해요. 기기 동기화에서 직접 클라우드에 복사하면 저장한 문제의 원본과 정리 이미지가 전송돼요.</p>
     <label>문제 이미지 <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={importImage} /></label>
     {error && <p role="alert" className="field-error">{error}</p>}
     {status && <p role="status">{status}</p>}
@@ -329,7 +329,7 @@ function SavedProblem({ entry }) {
       {cleaned && <a href={cleaned} download={`${filename}.png`}>정리 이미지 다운로드</a>}
       <button disabled={!endpoint || capability !== 'ready' || exporting} onClick={downloadHwpx}>HWPX 다운로드</button>
     </div>
-    {!endpoint ? <p className="pb-note">HWPX는 이 PC의 로컬 Vite 서버(http://127.0.0.1)에서만 다운로드할 수 있어요. 이 페이지는 문제 이미지를 전송하지 않아요.</p>
+    {!endpoint ? <p className="pb-note">HWPX는 이 PC의 로컬 Vite 서버(http://127.0.0.1)에서만 변환하고 다운로드할 수 있어요.</p>
       : capability === 'checking' ? <p className="pb-note">로컬 HWPX 변환기를 확인하고 있어요.</p>
       : capability === 'unavailable' ? <p className="pb-note">로컬 HWPX 변환기를 사용할 수 없어요. Vite 서버의 LEAN_HWPX_PYTHON 설정을 확인해 주세요. 이미지 다운로드는 계속 사용할 수 있어요.</p>
       : null}

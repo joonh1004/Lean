@@ -12,17 +12,17 @@ import {
 } from "./quotes";
 import QuoteLibrary from "./QuoteLibrary";
 import { QuoteContext } from "./QuoteContext";
+import { localWrite, workspaceStorage } from "./workspaceStorage.js";
+import { usePendingSubmission } from "./useEditorSession.js";
 import "./editor.css";
 const todayKey = () => dateKey(new Date());
 const storageMessage =
   "이 브라우저에 저장하지 못했어. 저장 설정을 확인하고 다시 시도해줘.";
-function persist(state) {
-  saveQuoteState(localStorage, state);
-}
 function readSession(day) {
   let state;
+  let raw;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    raw = workspaceStorage.getItem(STORAGE_KEY);
     state = raw === null ? defaultState() : parseState(raw);
   } catch {
     return {
@@ -31,62 +31,65 @@ function readSession(day) {
       error: "저장된 문구를 읽을 수 없어. 기존 데이터는 변경하지 않았어.",
     };
   }
-  state = assignDay(state, day);
+  const assigned = assignDay(state, day);
   try {
-    persist(state);
-    return { day, state, error: "" };
+    if (raw === null || assigned !== state) saveQuoteState(workspaceStorage, assigned);
+    return { day, state: assigned, error: "" };
   } catch {
-    return { day, state, error: storageMessage };
+    return { day, state: assigned, error: storageMessage };
   }
 }
 export default function DailyEntry({ children }) {
-  const [session, setSession] = useState(() => readSession(todayKey()));
+  const [session, setSession] = useState(null);
   const [managing, setManaging] = useState(false);
-  function commit(next) {
-    if (todayKey() !== session.day) throw new Error("Day changed; reload");
+  const requestedDay = useRef(null);
+  async function refresh(force = false) {
+    const day = todayKey();
+    if (!force && requestedDay.current === day) return;
+    requestedDay.current = day;
+    let next;
+    try { next = await localWrite(() => readSession(day)); }
+    catch { next = { day, state: null, error: '작업공간을 열 수 없어요. 이 탭을 새로고침해 주세요.' }; }
+    if (requestedDay.current === day) setSession(next);
+  }
+  async function commit(next) {
     const assigned = assignDay(next, session.day);
-    saveQuoteState(localStorage, assigned, session.state);
-    setSession({ ...session, state: assigned, error: "" });
+    await localWrite(() => {
+      if (todayKey() !== session.day) throw new Error("Day changed; reload");
+      saveQuoteState(workspaceStorage, assigned, session.state);
+    });
+    setSession(current => current?.day === session.day ? { ...session, state: assigned, error: "" } : current);
   }
   useEffect(() => {
-    const refresh = () => {
-      const day = todayKey();
-      setSession((previous) =>
-        day === previous.day ? previous : readSession(day),
-      );
-    };
-    const timer = setInterval(refresh, 15000);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
+    const checkDay = () => { void refresh(); };
+    checkDay();
+    const timer = setInterval(checkDay, 15000);
+    window.addEventListener("focus", checkDay);
+    document.addEventListener("visibilitychange", checkDay);
     return () => {
       clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", checkDay);
+      document.removeEventListener("visibilitychange", checkDay);
     };
   }, []);
-  function finish(input, composing) {
+  async function finish(input, composing) {
     const day = todayKey();
     if (day !== session.day) {
-      setSession(readSession(day));
+      await refresh();
       return;
     }
     const next = completeDay(session.state, day, input, composing);
     if (next === session.state) return;
-    try {
-      saveQuoteState(localStorage, next, session.state);
-      setSession({ ...session, state: next, error: "" });
-    } catch {
-      setSession({ ...session, error: storageMessage });
-    }
+    await commit(next);
   }
-  function addFirst(text) {
+  async function addFirst(text) {
     if (!text.trim()) return;
-    try {
-      commit(addQuote(session.state, text));
-    } catch {
-      setSession({ ...session, error: storageMessage });
-    }
+    await commit(addQuote(session.state, text));
   }
+  function reportStorageError() {
+    setSession(current => current?.day === session.day ? { ...current, error: storageMessage } : current);
+  }
+  if (!session) return null;
   if (!session.state)
     return (
       <div className="quote-stage">
@@ -95,7 +98,7 @@ export default function DailyEntry({ children }) {
           <p role="alert">{session.error}</p>
           <button
             className="primary"
-            onClick={() => setSession(readSession(todayKey()))}
+            onClick={() => refresh(true)}
           >
             다시 시도
           </button>
@@ -127,6 +130,7 @@ export default function DailyEntry({ children }) {
           : undefined
       }
       error={session.error}
+      onStorageError={reportStorageError}
       onFinish={finish}
       onAdd={addFirst}
       onManage={() => setManaging(true)}
@@ -152,11 +156,17 @@ function fitTextarea(element) {
   element.style.height = `${Math.min(240, Math.max(112, contentHeight))}px`;
   element.style.overflowY = contentHeight > 240 ? "auto" : "hidden";
 }
-function QuoteGate({ day, quote, error, onFinish, onAdd, onManage, sample }) {
+function QuoteGate({
+  day, quote, error, onStorageError, onFinish, onAdd, onManage, sample,
+}) {
   const [input, setInput] = useState(""),
     [composing, setComposing] = useState(false);
+  const { pending, isPending, run } = usePendingSubmission();
   const compositionRef = useRef(false),
     field = useRef(null);
+  function updateInput(e) {
+    if (!isPending()) setInput(e.currentTarget.value);
+  }
   useLayoutEffect(() => {
     fitTextarea(field.current);
   }, [input, quote]);
@@ -183,8 +193,13 @@ function QuoteGate({ day, quote, error, onFinish, onAdd, onManage, sample }) {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (canEnter(input, quote, compositionRef.current))
-                  onFinish(input, compositionRef.current);
+                if (canEnter(input, quote, compositionRef.current)) {
+                  void run(
+                    "저장 중…",
+                    () => onFinish(input, compositionRef.current),
+                    onStorageError,
+                  );
+                }
               }}
             >
               <label htmlFor="quote-input">문구 입력</label>
@@ -193,20 +208,26 @@ function QuoteGate({ day, quote, error, onFinish, onAdd, onManage, sample }) {
                 ref={field}
                 value={input}
                 aria-describedby="quote-hint"
-                onChange={(e) => setInput(e.target.value)}
+                disabled={!!pending}
+                onChange={updateInput}
                 onCompositionStart={() => {
+                  if (isPending()) return;
                   compositionRef.current = true;
                   setComposing(true);
                 }}
                 onCompositionEnd={(e) => {
                   compositionRef.current = false;
                   setComposing(false);
-                  setInput(e.currentTarget.value);
+                  updateInput(e);
                 }}
               />
               <div className="quote-actions">
                 <span id="quote-hint">위 문구를 그대로 입력</span>
-                <button className="primary" type="submit" disabled={!matched}>
+                <button
+                  className="primary"
+                  type="submit"
+                  disabled={!!pending || !matched}
+                >
                   시작
                 </button>
               </div>
@@ -216,7 +237,7 @@ function QuoteGate({ day, quote, error, onFinish, onAdd, onManage, sample }) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              onAdd(input);
+              if (input.trim()) void run("저장 중…", () => onAdd(input), onStorageError);
             }}
           >
             <h1>첫 문구</h1>
@@ -226,20 +247,28 @@ function QuoteGate({ day, quote, error, onFinish, onAdd, onManage, sample }) {
               id="first-quote"
               ref={field}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              disabled={!!pending}
+              onChange={updateInput}
             />
             <div className="quote-actions">
               <span />
-              <button className="primary" disabled={!input.trim()}>
+              <button className="primary" disabled={!!pending || !input.trim()}>
                 저장
               </button>
             </div>
           </form>
         )}
-        <button className="manage-quotes" onClick={onManage}>
+        <button
+          className="manage-quotes"
+          disabled={!!pending}
+          onClick={() => {
+            if (!isPending()) onManage();
+          }}
+        >
           명언 관리
         </button>
-        {error && (
+        {pending && <p role="status">{pending}</p>}
+        {!pending && error && (
           <p className="storage-error" role="alert">
             {error}
           </p>

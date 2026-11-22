@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { validateDraft } from "./records";
 import { folderPath } from "./repository";
+import { usePendingSubmission } from "./useEditorSession.js";
 export function FolderForm({
   folder,
   parentId,
@@ -12,21 +13,26 @@ export function FolderForm({
   const [name, setName] = useState(folder?.name || ""),
     [parent, setParent] = useState(folder ? folder.parentId : parentId),
     [error, setError] = useState("");
+  const { pending, isPending, run } = usePendingSubmission();
+  function submit(message, write) {
+    if (isPending()) return;
+    setError("");
+    void run(message, write, (error) => {
+      setError(error.message || "저장하지 못했어요. 다시 시도해 주세요.");
+    });
+  }
   return (
     <>
       <h2>{folder ? "폴더 수정" : "폴더 추가"}</h2>
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (isPending()) return;
           if (!name.trim()) {
             setError("폴더 이름을 입력해 주세요.");
             return;
           }
-          try {
-            onSave({ name, parentId: parent });
-          } catch (error) {
-            setError(error.message || "저장하지 못했어요. 다시 시도해 주세요.");
-          }
+          submit("저장 중…", () => onSave({ name, parentId: parent }));
         }}
       >
         <div className="field">
@@ -35,7 +41,10 @@ export function FolderForm({
             data-autofocus
             id="folder-name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            disabled={!!pending}
+            onChange={(e) => {
+              if (!isPending()) setName(e.target.value);
+            }}
           />
         </div>
         <div className="field">
@@ -43,7 +52,10 @@ export function FolderForm({
           <select
             id="folder-parent"
             value={parent || ""}
-            onChange={(e) => setParent(e.target.value || null)}
+            disabled={!!pending}
+            onChange={(e) => {
+              if (!isPending()) setParent(e.target.value || null);
+            }}
           >
             <option value="">저장소</option>
             {folders
@@ -60,19 +72,15 @@ export function FolderForm({
             {error}
           </p>
         )}
+        {pending && <p role="status">{pending}</p>}
         <div className="editor-actions">
           <div>
             {folder && (
               <button
                 type="button"
                 className="delete-link"
-                onClick={() => {
-                  try {
-                    onDelete(folder.id);
-                  } catch (error) {
-                    setError(error.message);
-                  }
-                }}
+                disabled={!!pending}
+                onClick={() => submit("삭제 중…", () => onDelete(folder.id))}
               >
                 폴더 삭제
               </button>
@@ -82,7 +90,7 @@ export function FolderForm({
             <button type="button" onClick={onCancel}>
               취소
             </button>
-            <button className="primary" type="submit">
+            <button className="primary" type="submit" disabled={!!pending}>
               저장
             </button>
           </div>
@@ -107,6 +115,7 @@ export function ResourceForm({
     [errors, setErrors] = useState({}),
     [failure, setFailure] = useState(""),
     [confirm, setConfirm] = useState(false);
+  const { pending, isPending, run } = usePendingSubmission();
   const cancelDelete = useRef(null),
     deleteButton = useRef(null),
     previousConfirm = useRef(false);
@@ -116,6 +125,7 @@ export function ResourceForm({
     previousConfirm.current = confirm;
   }, [confirm]);
   const set = (key, value) => {
+    if (isPending()) return;
     setDraft((previous) => ({ ...previous, [key]: value }));
     setErrors((previous) => ({ ...previous, [key]: undefined }));
     setFailure("");
@@ -127,7 +137,7 @@ export function ResourceForm({
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          if (confirm) return;
+          if (isPending() || confirm) return;
           const invalid = validateDraft(draft);
           setErrors(invalid);
           if (Object.keys(invalid).length) {
@@ -136,11 +146,10 @@ export function ResourceForm({
               ?.focus();
             return;
           }
-          try {
-            onSave(draft);
-          } catch {
+          setFailure("");
+          void run("저장 중…", () => onSave(draft), () => {
             setFailure("저장하지 못했어요. 다시 시도해 주세요.");
-          }
+          });
         }}
       >
         {!record && (
@@ -149,6 +158,7 @@ export function ResourceForm({
             <select
               id="resource-type"
               value={draft.type}
+              disabled={!!pending}
               onChange={(e) => set("type", e.target.value)}
             >
               <option value="note">메모</option>
@@ -162,6 +172,7 @@ export function ResourceForm({
             data-autofocus
             id="resource-title"
             value={draft.title}
+            disabled={!!pending}
             aria-invalid={!!errors.title}
             aria-describedby={errors.title ? "resource-title-error" : undefined}
             onChange={(e) => set("title", e.target.value)}
@@ -177,6 +188,7 @@ export function ResourceForm({
           <select
             id="resource-folder"
             value={draft.folderId || ""}
+            disabled={!!pending}
             onChange={(e) => set("folderId", e.target.value || null)}
           >
             <option value="">저장소</option>
@@ -193,6 +205,7 @@ export function ResourceForm({
             <textarea
               id="resource-body"
               value={draft.body}
+              disabled={!!pending}
               onChange={(e) => set("body", e.target.value)}
             />
           </div>
@@ -203,6 +216,7 @@ export function ResourceForm({
               id="resource-url"
               type="url"
               value={draft.url}
+              disabled={!!pending}
               aria-invalid={!!errors.url}
               aria-describedby={errors.url ? "resource-url-error" : undefined}
               onChange={(e) => set("url", e.target.value)}
@@ -219,6 +233,7 @@ export function ResourceForm({
             {failure}
           </p>
         )}
+        {pending && <p role="status">{pending}</p>}
         {confirm ? (
           <div className="delete-confirm">
             <p>
@@ -229,6 +244,7 @@ export function ResourceForm({
               <button
                 ref={cancelDelete}
                 type="button"
+                disabled={!!pending}
                 onClick={() => setConfirm(false)}
               >
                 취소
@@ -236,12 +252,13 @@ export function ResourceForm({
               <button
                 className="danger"
                 type="button"
+                disabled={!!pending}
                 onClick={() => {
-                  try {
-                    onDelete(record.id);
-                  } catch {
+                  if (isPending()) return;
+                  setFailure("");
+                  void run("삭제 중…", () => onDelete(record.id), () => {
                     setFailure("삭제하지 못했어요. 다시 시도해 주세요.");
-                  }
+                  });
                 }}
               >
                 원본 삭제
@@ -256,6 +273,7 @@ export function ResourceForm({
                   className="delete-link"
                   type="button"
                   ref={deleteButton}
+                  disabled={!!pending}
                   onClick={() => setConfirm(true)}
                 >
                   원본 삭제
@@ -266,7 +284,7 @@ export function ResourceForm({
               <button type="button" onClick={onCancel}>
                 취소
               </button>
-              <button className="primary" type="submit">
+              <button className="primary" type="submit" disabled={!!pending}>
                 저장
               </button>
             </div>

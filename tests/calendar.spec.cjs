@@ -5,6 +5,7 @@ test.beforeEach(async ({ page }) => {
     .getByRole("textbox", { name: "문구 입력" })
     .fill(await page.getByRole("blockquote").innerText());
   await page.getByRole("button", { name: "시작", exact: true }).click();
+  await expect(page.getByRole("region", { name: "월간 캘린더" })).toBeVisible();
 });
 test("tab state matches content and has a persistent indicator while other tab is hovered", async ({
   page,
@@ -61,7 +62,8 @@ test("completed detail keeps full title readable without strike-through", async 
 }) => {
   await page.goto("http://127.0.0.1:5173/?view=calendar-sample");
   await page.getByRole("button", { name: "2026-08-13 상세" }).click();
-  await page.getByRole("dialog").getByRole("checkbox").first().check();
+  await page.getByRole("dialog").getByRole("checkbox").first().click();
+  await expect(page.getByRole("dialog").getByRole("checkbox").first()).toBeChecked();
   await expect(page.locator(".detail-item.done .full-title").first()).toHaveCSS(
     "text-decoration-line",
     "none",

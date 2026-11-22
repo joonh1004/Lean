@@ -1,0 +1,34 @@
+.sync-launch {
+  position: fixed;
+  right: max(.75rem, env(safe-area-inset-right));
+  bottom: max(.75rem, env(safe-area-inset-bottom));
+  z-index: 4;
+}
+.sync-launch, .sync-panel button {
+  border: 1px solid #65716a;
+  background: #fff;
+  color: #193329;
+  padding: .45rem .7rem;
+  border-radius: .45rem;
+  font: inherit;
+}
+.sync-panel button:disabled { opacity: .6; }
+.sync-panel {
+  box-sizing: border-box;
+  width: min(34rem, calc(100% - 1.5rem));
+  max-height: 85vh;
+  overflow: auto;
+  border: 1px solid #65716a;
+  border-radius: .75rem;
+  background: #fff;
+  color: #193329;
+  padding: 1.15rem;
+}
+.sync-panel::backdrop { background: #102118aa; }
+.sync-panel header, .sync-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.sync-panel header { justify-content: space-between; }
+.sync-panel h2, .sync-panel h3 { margin: .25rem 0; }
+.sync-panel form, .sync-panel form label { display: grid; gap: .5rem; }
+.sync-panel input { width: 100%; padding: .4rem; font: inherit; }
+.sync-panel section { border-top: 1px solid #c9cfca; margin-top: .75rem; padding-top: .5rem; }
+.sync-panel [role=alert] { color: #8a2823; }

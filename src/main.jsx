@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import Workspace from "./Workspace";
 import DailyEntry from "./DailyEntry";
+import SyncPanel from "./SyncPanel.jsx";
 import "./style.css";
 import "./flow.css";
 const titles = [
@@ -68,7 +69,10 @@ const events = [
   },
 ];
 createRoot(document.getElementById("root")).render(
-  <DailyEntry>
-    <Workspace sampleTasks={initialTasks} sampleEvents={events} />
-  </DailyEntry>,
+  <>
+    <DailyEntry>
+      <Workspace sampleTasks={initialTasks} sampleEvents={events} />
+    </DailyEntry>
+    <SyncPanel />
+  </>,
 );

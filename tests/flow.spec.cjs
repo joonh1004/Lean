@@ -13,7 +13,8 @@ test("today uses dated fixtures without moving records and shares completion wit
     events = page.getByRole("region", { name: "오늘 일정" });
   await expect(tasks.getByRole("checkbox")).toHaveCount(6);
   await expect(events.getByText("16:00")).toBeVisible();
-  await tasks.getByRole("checkbox").first().check();
+  await tasks.getByRole("checkbox").first().click();
+  await expect(tasks.getByRole("checkbox").first()).toBeChecked();
   await page.screenshot({
     path: "artifacts/today-fixture-1440.png",
     animations: "disabled",

@@ -25,6 +25,7 @@ test.beforeEach(async ({ page }) => {
     .getByRole("textbox", { name: "문구 입력" })
     .fill(await page.getByRole("blockquote").innerText());
   await page.getByRole("button", { name: "시작", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "오늘", exact: true })).toBeVisible();
 });
 
 for (const { tab, title } of [
@@ -51,6 +52,7 @@ for (const { tab, title } of [
     await color.press("End");
     await expect(color.locator("option:checked")).toHaveText("보라");
     await save.click();
+    await expect(color).toHaveCount(0);
 
     await page.reload();
     const today = page.getByRole("region", { name: `오늘 ${tab}` });
@@ -89,6 +91,7 @@ for (const { tab, title } of [
     await color.press("Home");
     await expect(color.locator("option:checked")).toHaveText("기본");
     await save.click();
+    await expect(color).toHaveCount(0);
     await page.reload();
     await expect(
       today.locator(".today-item").filter({ hasText: title }),
@@ -129,6 +132,7 @@ test("sample month keeps legacy appearance, overflow, completion and deadline cu
     await expect(color.locator("option:checked")).toHaveText("기본");
     await color.selectOption({ label: choice });
     await detail.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(color).toHaveCount(0);
     await page.keyboard.press("Escape");
   }
   await page.reload();

@@ -111,6 +111,7 @@ for (const width of [1440, 1280])
     await page.getByRole("button", { name: "삭제", exact: true }).click();
     await expect(page.locator(".quote-delete-copy")).toHaveText(original);
     await page.getByRole("button", { name: "삭제 확인", exact: true }).click();
+    await page.evaluate(() => navigator.locks.request('lean-workspace-change-v1', () => {}));
     await expect(page.getByRole("dialog")).toBeVisible();
     expect(await bytes()).toBe(before);
     await expect(field).toHaveValue(
@@ -128,6 +129,7 @@ for (const width of [1440, 1280])
       };
     });
     await page.getByRole("button", { name: "저장", exact: true }).click();
+    await page.evaluate(() => navigator.locks.request('lean-workspace-change-v1', () => {}));
     await expect(page.getByRole("dialog")).toBeVisible();
     expect(await bytes()).toBe(before);
     await page.evaluate(
@@ -156,6 +158,7 @@ for (const width of [1440, 1280])
       await page
         .getByRole("button", { name: "삭제 확인", exact: true })
         .click();
+      await expect(page.locator(".quote-row")).toHaveCount(2 - i);
     }
     await page.getByRole("button", { name: "수정", exact: true }).click();
     await page.getByRole("button", { name: "삭제", exact: true }).click();

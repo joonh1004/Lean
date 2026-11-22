@@ -13,6 +13,7 @@ import {
 import { createRecord, updateRecord, deleteRecord } from "./records";
 import "./repository.css";
 import ProblemBank from "./ProblemBank.jsx";
+import { useEditorSession } from "./useEditorSession.js";
 export default function Repository({ store, commit, initialSelection = null }) {
   const [bankOpen, setBankOpen] = useState(false);
   const folders = store.folders || [],
@@ -21,8 +22,8 @@ export default function Repository({ store, commit, initialSelection = null }) {
     [query, setQuery] = useState(""),
     [selected, setSelected] = useState(initialSelection),
     [detailOpen, setDetailOpen] = useState(!!initialSelection),
-    [modal, setModal] = useState(null),
     [error, setError] = useState("");
+  const [modal, setModal, closeModal] = useEditorSession();
   const [expanded, setExpanded] = useState(
       () => new Set(folders.map((f) => f.id)),
     ),
@@ -51,53 +52,54 @@ export default function Repository({ store, commit, initialSelection = null }) {
         )
       : folder === "all" || r.folderId === folder,
   );
-  function apply(next) {
+  async function apply(next) {
     try {
-      commit(next);
+      await commit(next);
     } catch {
       throw new Error("저장하지 못했어요. 다시 시도해 주세요.");
     }
     setError("");
   }
-  function saveResource(draft) {
+  async function saveResource(draft) {
     const next = modal.record
       ? updateRecord(store, modal.record.id, draft)
       : null;
     const created = next ? null : createRecord(draft);
-    apply(next || { ...store, records: [...store.records, created] });
+    await apply(next || { ...store, records: [...store.records, created] });
+    if (!closeModal(modal)) return;
     setSelected(modal.record?.id || created.id);
     setDetailOpen(true);
-    setModal(null);
   }
-  function deleteResource(id) {
-    apply(deleteRecord(store, id));
-    setModal(null);
+  async function deleteResource(id) {
+    await apply(deleteRecord(store, id));
+    if (!closeModal(modal)) return;
     setSelected(null);
     setDetailOpen(false);
   }
-  function saveFolder(draft) {
+  async function saveFolder(draft) {
     if (modal.folder) {
-      apply(editFolder(store, modal.folder.id, draft));
+      await apply(editFolder(store, modal.folder.id, draft));
+      closeModal(modal);
     } else {
       const id = crypto.randomUUID();
-      apply(addFolder(store, draft.name, draft.parentId, id));
+      await apply(addFolder(store, draft.name, draft.parentId, id));
+      if (!closeModal(modal)) return;
       setFolder(id);
       setExpanded((previous) => new Set([...previous, draft.parentId, id]));
     }
-    setModal(null);
   }
-  function deleteFolder(id) {
-    apply(removeFolder(store, id));
+  async function deleteFolder(id) {
+    await apply(removeFolder(store, id));
+    if (!closeModal(modal)) return;
     setFolder(activeFolder?.parentId ?? null);
-    setModal(null);
   }
-  function connect(taskId, resourceId) {
-    apply(linkResource(store, taskId, resourceId));
-    setModal(null);
+  async function connect(taskId, resourceId) {
+    await apply(linkResource(store, taskId, resourceId));
+    closeModal(modal);
   }
-  function unlink(taskId, resourceId) {
+  async function unlink(taskId, resourceId) {
     try {
-      apply(unlinkResource(store, taskId, resourceId));
+      await apply(unlinkResource(store, taskId, resourceId));
     } catch {
       setError("연결 해제하지 못했어요. 다시 시도해 주세요.");
     }

@@ -3,9 +3,10 @@ import Modal from "./Modal";
 import { useQuotes } from "./QuoteContext";
 import { addQuote, editQuote, removeQuote } from "./quotes";
 import "./quote-library.css";
+import { useEditorSession, usePendingSubmission } from "./useEditorSession.js";
 export default function QuoteLibrary({ onReturn }) {
   const { state, day, commit } = useQuotes();
-  const [editor, setEditor] = useState(null);
+  const [editor, setEditor, closeEditor] = useEditorSession();
   const heading = useRef(null),
     focusHeading = useRef(true);
   useEffect(() => {
@@ -50,18 +51,17 @@ export default function QuoteLibrary({ onReturn }) {
           quote={editor.quote}
           affected={!!editor.quote && state.days[day]?.id === editor.quote.id}
           onClose={() => setEditor(null)}
-          onSave={(text) => {
-            commit(
+          onSave={async (text) => {
+            await commit(
               editor.quote
                 ? editQuote(state, editor.quote.id, text)
                 : addQuote(state, text),
             );
-            setEditor(null);
+            closeEditor(editor);
           }}
-          onDelete={() => {
-            commit(removeQuote(state, editor.quote.id));
-            focusHeading.current = true;
-            setEditor(null);
+          onDelete={async () => {
+            await commit(removeQuote(state, editor.quote.id));
+            if (closeEditor(editor)) focusHeading.current = true;
           }}
         />
       )}
@@ -80,6 +80,7 @@ function QuoteEditor({
   const [text, setText] = useState(quote?.text || ""),
     [error, setError] = useState(""),
     [confirm, setConfirm] = useState(false);
+  const { pending, isPending, run } = usePendingSubmission();
   const title = quote ? "명언 수정" : "명언 추가";
   const cancelDelete = useRef(null),
     deleteButton = useRef(null),
@@ -89,25 +90,19 @@ function QuoteEditor({
     else if (wasConfirm.current) deleteButton.current?.focus();
     wasConfirm.current = confirm;
   }, [confirm]);
-  function attempt(action) {
-    try {
-      action();
-    } catch {
+  function attempt(message, action) {
+    if (isPending()) return;
+    setError("");
+    void run(message, action, () => {
       setError("저장하지 못했어요. 저장 설정을 확인하고 다시 시도해 주세요.");
-    }
+    });
   }
   return (
     <Modal title={title} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          try {
-            onSave(text);
-          } catch {
-            setError(
-              "저장하지 못했어요. 저장 설정을 확인하고 다시 시도해 주세요.",
-            );
-          }
+          if (text.trim()) attempt("저장 중…", () => onSave(text));
         }}
       >
         <h2>{title}</h2>
@@ -117,7 +112,10 @@ function QuoteEditor({
           data-autofocus
           required
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          disabled={!!pending}
+          onChange={(e) => {
+            if (!isPending()) setText(e.target.value);
+          }}
         />
         {affected && <p className="quote-notice">오늘 입력 문구는 유지돼요.</p>}
         {error && (
@@ -125,6 +123,7 @@ function QuoteEditor({
             {error}
           </p>
         )}
+        {pending && <p role="status">{pending}</p>}
         <div className="editor-actions">
           <div>
             {quote && (
@@ -132,6 +131,7 @@ function QuoteEditor({
                 ref={deleteButton}
                 className="delete-link"
                 type="button"
+                disabled={!!pending}
                 onClick={() => setConfirm(true)}
               >
                 삭제
@@ -142,7 +142,7 @@ function QuoteEditor({
             <button type="button" onClick={onClose}>
               취소
             </button>
-            <button className="primary" disabled={!text.trim()}>
+            <button className="primary" disabled={!!pending || !text.trim()}>
               저장
             </button>
           </div>
@@ -168,6 +168,7 @@ function QuoteEditor({
               <button
                 ref={cancelDelete}
                 type="button"
+                disabled={!!pending}
                 onClick={() => setConfirm(false)}
               >
                 삭제 취소
@@ -175,7 +176,8 @@ function QuoteEditor({
               <button
                 className="danger"
                 type="button"
-                onClick={() => attempt(onDelete)}
+                disabled={!!pending}
+                onClick={() => attempt("삭제 중…", onDelete)}
               >
                 삭제 확인
               </button>

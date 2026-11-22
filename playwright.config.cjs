@@ -4,8 +4,9 @@ module.exports = defineConfig({
   testMatch: "*.spec.cjs",
   use: { viewport: { width: 1440, height: 900 }, browserName: "chromium" },
   webServer: {
-    command: "node.exe node_modules/vite/bin/vite.js --host 127.0.0.1",
+    command: "node node_modules/vite/bin/vite.js --host 127.0.0.1 --strictPort",
     url: "http://127.0.0.1:5173",
-    reuseExistingServer: true,
+    reuseExistingServer: false,
+    env: { VITE_SUPABASE_URL: "", VITE_SUPABASE_PUBLISHABLE_KEY: "" },
   },
 });

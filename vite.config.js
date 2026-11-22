@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
+import { parse } from 'dotenv';
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { syncConfig } from './src/syncProtocol.js';
 
 const writer = fileURLToPath(new URL('./tools/export_problem_hwpx.py', import.meta.url));
 const maxBytes = 70 * 1024 * 1024;
@@ -69,8 +72,33 @@ function localHwpx(python) {
   return { name: 'lean-local-hwpx', configureServer: install, configurePreviewServer: install };
 }
 
-export default defineConfig({
-  server: { host: '127.0.0.1' },
-  preview: { host: '127.0.0.1' },
-  plugins: [localHwpx(process.env.LEAN_HWPX_PYTHON)],
+function publicSync(mode) {
+  const env = {};
+  // Read literal settings without Vite's env/debug logging. Shell settings take
+  // precedence, including explicit blanks used for browser-only CI builds.
+  for (const filename of ['.env', '.env.local', `.env.${mode}`, `.env.${mode}.local`]) {
+    try { Object.assign(env, parse(readFileSync(new URL(filename, import.meta.url)))); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  const url = process.env.VITE_SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? '';
+  const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '';
+  const config = syncConfig(url, key);
+  if ((url !== '' || key !== '') && !config) {
+    throw new Error('Invalid Lean sync configuration: leave both settings blank or provide a hosted HTTPS Supabase project URL and a public publishable key.');
+  }
+  const id = 'virtual:lean-sync-config';
+  return {
+    name: 'lean-public-sync-config',
+    resolveId: request => request === id ? `\0${id}` : undefined,
+    load: request => request === `\0${id}` ? `export default ${JSON.stringify(config)};` : undefined,
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  return {
+    envPrefix: [],
+    server: { host: '127.0.0.1' },
+    preview: { host: '127.0.0.1' },
+    plugins: [publicSync(mode), localHwpx(process.env.LEAN_HWPX_PYTHON)],
+  };
 });

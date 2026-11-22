@@ -1,3 +1,5 @@
+import { assertActive, profileKey, registry, workspaceLock } from './workspaceStorage.js';
+
 export const unconfiguredProvider = Object.freeze({ name: 'Codex', status: 'unconfigured' });
 
 // A provider decision must describe the same rendered revision, with evidence and no concerns.
@@ -38,17 +40,31 @@ export function renderPreview(source, crop, marks, kept) {
   }, 'image/png'));
 }
 
-function openBank() {
+function openBank(id = registry().id, create = false) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('lean-problem-bank', 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('problems', { keyPath: 'id' });
+    const request = indexedDB.open(profileKey(id, 'lean-problem-bank'), 1);
+    let missing = false;
+    request.onupgradeneeded = () => {
+      if (create) {
+        request.result.createObjectStore('problems', { keyPath: 'id' });
+      } else {
+        // A read of a missing bank must not persist any schema. Do not acquire
+        // the workspace lock here: snapshot callers may already hold it.
+        missing = true;
+        request.transaction.abort();
+      }
+    };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      if (missing && request.error?.name === 'AbortError') resolve(null);
+      else reject(request.error);
+    };
   });
 }
 
 async function transaction(mode, perform) {
-  const db = await openBank();
+  const db = await openBank(undefined, mode === 'readwrite');
+  if (!db) return undefined;
   try {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction('problems', mode);
@@ -61,10 +77,28 @@ async function transaction(mode, perform) {
   }
 }
 
-export const saveProblem = entry => transaction('readwrite', store => store.add(entry));
+export const saveProblem = entry => {
+  const save = () => { assertActive(); return transaction('readwrite', store => store.add(entry)); };
+  return navigator.locks ? workspaceLock(save) : save();
+};
+export const problemIds = async () => (await transaction('readonly', store => store.getAllKeys())) ?? [];
+export async function stageProblems(id, entries) {
+  if (!entries.length) return;
+  const db = await openBank(id, true);
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('problems', 'readwrite');
+      tx.oncomplete = resolve;
+      tx.onabort = () => reject(tx.error || new Error('문제 이미지를 저장하지 못했어요.'));
+      try { for (const entry of entries) tx.objectStore('problems').add(entry); }
+      catch (error) { tx.abort(); reject(error); }
+    });
+  } finally { db.close(); }
+}
 export const listProblems = async () => {
   // Keep the list in React state free of media blobs.
   const db = await openBank();
+  if (!db) return [];
   try {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction('problems', 'readonly');

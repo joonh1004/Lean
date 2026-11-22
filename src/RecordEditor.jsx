@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { validateDraft } from "./records";
 import { RECORD_COLORS, recordColor } from "./recordColors";
+import { usePendingSubmission } from "./useEditorSession.js";
 export default function RecordEditor({
   record,
   type,
@@ -27,6 +28,7 @@ export default function RecordEditor({
   const [errors, setErrors] = useState({}),
     [failure, setFailure] = useState(""),
     [confirming, setConfirming] = useState(false);
+  const { pending, isPending, run } = usePendingSubmission();
   const titleRef = useRef(null);
   const confirmCancelRef = useRef(null),
     deleteRef = useRef(null),
@@ -37,31 +39,32 @@ export default function RecordEditor({
     wasConfirming.current = confirming;
   }, [confirming]);
   const set = (key, value) => {
+    if (isPending()) return;
     setDraft((previous) => ({ ...previous, [key]: value }));
     setErrors((previous) => ({ ...previous, [key]: undefined }));
     setFailure("");
   };
   const heading = `${task ? "할 일" : "일정"} ${record ? "수정" : "추가"}`;
-  async function submit(e) {
+  function submit(e) {
     e.preventDefault();
+    if (isPending() || confirming) return;
     const invalid = validateDraft(draft);
     setErrors(invalid);
     if (Object.keys(invalid).length) {
       document.getElementById(`record-${Object.keys(invalid)[0]}`)?.focus();
       return;
     }
-    try {
-      onSave(draft);
-    } catch {
+    setFailure("");
+    void run("저장 중…", () => onSave(draft), () => {
       setFailure("저장하지 못했어요. 다시 시도해 주세요.");
-    }
+    });
   }
   function remove() {
-    try {
-      onDelete(record.id);
-    } catch {
+    if (isPending()) return;
+    setFailure("");
+    void run("삭제 중…", () => onDelete(record.id), () => {
       setFailure("삭제하지 못했어요. 다시 시도해 주세요.");
-    }
+    });
   }
   return (
     <section
@@ -80,6 +83,7 @@ export default function RecordEditor({
             ref={titleRef}
             value={draft.title}
             required
+            disabled={!!pending}
             aria-invalid={Boolean(errors.title)}
             aria-describedby={errors.title ? "error-title" : undefined}
             onChange={(e) => set("title", e.target.value)}
@@ -97,6 +101,7 @@ export default function RecordEditor({
             type="date"
             value={draft.date}
             required
+            disabled={!!pending}
             aria-invalid={Boolean(errors.date)}
             aria-describedby={errors.date ? "error-date" : undefined}
             onChange={(e) => set("date", e.target.value)}
@@ -112,7 +117,11 @@ export default function RecordEditor({
             <>
               <div className="optional-heading">
                 <label htmlFor={`record-${optional}`}>{label}</label>
-                <button type="button" onClick={() => setExpanded(false)}>
+                <button
+                  type="button"
+                  disabled={!!pending}
+                  onClick={() => setExpanded(false)}
+                >
                   접기
                 </button>
               </div>
@@ -120,6 +129,7 @@ export default function RecordEditor({
                 id={`record-${optional}`}
                 type={task ? "date" : "time"}
                 value={draft[optional] || ""}
+                disabled={!!pending}
                 aria-invalid={Boolean(errors[optional])}
                 aria-describedby={
                   errors[optional] ? `error-${optional}` : undefined
@@ -130,6 +140,7 @@ export default function RecordEditor({
                 <button
                   className="remove-value"
                   type="button"
+                  disabled={!!pending}
                   onClick={() => set(optional, null)}
                 >
                   {label} 제거
@@ -138,7 +149,11 @@ export default function RecordEditor({
             </>
           ) : (
             <div className="optional-summary">
-              <button type="button" onClick={() => setExpanded(true)}>
+              <button
+                type="button"
+                disabled={!!pending}
+                onClick={() => setExpanded(true)}
+              >
                 {label} {draft[optional] ? "펼치기" : "추가"}
               </button>
               {draft[optional] && <span>{draft[optional]}</span>}
@@ -155,6 +170,7 @@ export default function RecordEditor({
           <select
             id="record-color"
             value={recordColor(draft.color) ?? ""}
+            disabled={!!pending}
             onChange={(e) => set("color", e.target.value || null)}
           >
             <option value="">기본</option>
@@ -175,6 +191,7 @@ export default function RecordEditor({
             {failure}
           </p>
         )}
+        {pending && <p role="status">{pending}</p>}
         {confirming ? (
           <div className="delete-confirm">
             <p>‘{record.title}’을 삭제할까요?</p>
@@ -182,11 +199,17 @@ export default function RecordEditor({
               <button
                 ref={confirmCancelRef}
                 type="button"
+                disabled={!!pending}
                 onClick={() => setConfirming(false)}
               >
                 취소
               </button>
-              <button className="danger" type="button" onClick={remove}>
+              <button
+                className="danger"
+                type="button"
+                disabled={!!pending}
+                onClick={remove}
+              >
                 삭제
               </button>
             </div>
@@ -199,6 +222,7 @@ export default function RecordEditor({
                   className="delete-link"
                   ref={deleteRef}
                   type="button"
+                  disabled={!!pending}
                   onClick={() => setConfirming(true)}
                 >
                   삭제
@@ -209,7 +233,7 @@ export default function RecordEditor({
               <button type="button" onClick={onCancel}>
                 취소
               </button>
-              <button className="primary" type="submit">
+              <button className="primary" type="submit" disabled={!!pending}>
                 저장
               </button>
             </div>

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { folderPath, relationDateLabel } from "./repository";
+import { usePendingSubmission } from "./useEditorSession.js";
 export const kindLabel = (type) =>
   ({ task: "할 일", event: "일정", note: "메모", link: "링크" })[type];
 export default function RelationChoices({
@@ -11,6 +12,7 @@ export default function RelationChoices({
 }) {
   const [query, setQuery] = useState(""),
     [error, setError] = useState("");
+  const { pending, isPending, run } = usePendingSubmission();
   const candidates = store.records
     .filter((r) =>
       owner
@@ -28,7 +30,10 @@ export default function RelationChoices({
         <input
           data-autofocus
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          disabled={!!pending}
+          onChange={(e) => {
+            if (!isPending()) setQuery(e.target.value);
+          }}
         />
       </label>
       {error && (
@@ -36,6 +41,7 @@ export default function RelationChoices({
           {error}
         </p>
       )}
+      {pending && <p role="status">{pending}</p>}
       <div className="relation-choices">
         {candidates.length ? (
           candidates.map((candidate) => {
@@ -55,14 +61,14 @@ export default function RelationChoices({
                 </span>
                 <button
                   type="button"
-                  disabled={linked}
+                  disabled={linked || !!pending}
                   aria-label={`${linked ? "연결됨" : "연결"} ${kindLabel(candidate.type)} ${candidate.title} ${path}`}
                   onClick={() => {
-                    try {
-                      onConnect(task.id, note.id);
-                    } catch {
+                    if (isPending()) return;
+                    setError("");
+                    void run("연결 중…", () => onConnect(task.id, note.id), () => {
                       setError("연결하지 못했어요. 다시 시도해 주세요.");
-                    }
+                    });
                   }}
                 >
                   {linked ? "연결됨" : "연결"}

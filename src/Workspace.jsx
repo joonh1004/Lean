@@ -2,10 +2,12 @@ import QuoteLibrary from "./QuoteLibrary";
 import React, { useState, useRef, useEffect } from "react";
 import { dateKey, monthDays } from "./calendar";
 import { recordColor } from "./recordColors";
+import { localWrite, workspaceStorage } from "./workspaceStorage.js";
 import {
   createRecord,
   updateRecord,
   deleteRecord,
+  RECORDS_KEY,
   loadRecords,
   saveRecords,
 } from "./records";
@@ -13,6 +15,7 @@ import RecordEditor from "./RecordEditor";
 import Repository from "./Repository.jsx";
 import RelationChoices from "./RelationChoices";
 import { linkResource, unlinkResource } from "./repository";
+import { useEditorSession } from "./useEditorSession.js";
 import "./editor.css";
 export default function Workspace({ sampleTasks, sampleEvents }) {
   const sampleView =
@@ -27,7 +30,7 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
   const [selected, setSelected] = useState(
     sampleView ? null : dateKey(new Date()),
   );
-  function read() {
+  async function read() {
     try {
       const timestamp = "2026-08-01T00:00:00.000Z";
       const seed = {
@@ -54,18 +57,19 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
           })),
         ],
       };
-      return { store: loadRecords(localStorage, seed), error: "" };
+      const store = await localWrite(() => loadRecords(workspaceStorage, seed));
+      setData({ store, error: "" });
     } catch {
-      return {
+      setData({
         store: null,
         error:
           "기록을 읽거나 저장하지 못했어요. 기존 데이터는 변경하지 않았어요.",
-      };
+      });
     }
   }
-  const [picker, setPicker] = useState(null),
-    [resourceSelection, setResourceSelection] = useState(null);
-  const [data, setData] = useState(read),
+  const [picker, setPicker, closePicker] = useEditorSession();
+  const [resourceSelection, setResourceSelection] = useState(null);
+  const [data, setData] = useState({ store: null, error: "" }),
     [detail, setDetail] = useState(false),
     [editor, setEditor] = useState(null);
   const opener = useRef(null),
@@ -75,6 +79,8 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
   const records = data.store?.records || [],
     tasks = records.filter((r) => r.type === "task"),
     events = records.filter((r) => r.type === "event");
+  const relationOwner = picker &&
+    (records.find((item) => item.id === picker.owner.id) || picker.owner);
   const today = dateKey(new Date()),
     days = monthDays(month.getFullYear(), month.getMonth()),
     items = mode === "할 일" ? tasks : events;
@@ -85,13 +91,20 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
       : detail
         ? "detail"
         : null;
-  function commit(next) {
-    saveRecords(localStorage, next);
+  useEffect(() => { void read(); }, []);
+  async function commit(next) {
+    await localWrite(() => {
+      const raw = workspaceStorage.getItem(RECORDS_KEY);
+      // A queued mutation must not overwrite a newer same-workspace copy.
+      if (raw === null || JSON.stringify(JSON.parse(raw)) !== JSON.stringify(data.store))
+        throw new Error("Records changed; reload before editing");
+      saveRecords(workspaceStorage, next);
+    });
     setData({ store: next, error: "" });
   }
-  function toggle(item) {
+  async function toggle(item) {
     try {
-      commit(updateRecord(data.store, item.id, { done: !item.done }));
+      await commit(updateRecord(data.store, item.id, { done: !item.done }));
     } catch {
       setData((previous) => ({
         ...previous,
@@ -106,19 +119,19 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
     returnItem.current = record?.id || null;
     setEditor({ type, date, record });
   }
-  function save(draft) {
+  async function save(draft) {
     const next = editor.record
       ? updateRecord(data.store, editor.record.id, draft)
       : {
           ...data.store,
           records: [...data.store.records, createRecord(draft)],
         };
-    commit(next);
-    setEditor(null);
+    await commit(next);
+    setEditor((current) => current === editor ? null : current);
   }
-  function remove(id) {
-    commit(deleteRecord(data.store, id));
-    setEditor(null);
+  async function remove(id) {
+    await commit(deleteRecord(data.store, id));
+    setEditor((current) => current === editor ? null : current);
   }
   function calendar(type = "할 일") {
     const now = new Date();
@@ -165,7 +178,10 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
         ].filter((el) => !el.disabled && el.offsetParent !== null);
         const first = controls[0],
           last = controls.at(-1);
-        if (e.shiftKey && document.activeElement === first) {
+        if (!root.contains(document.activeElement)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first)?.focus();
+        } else if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
           last?.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
@@ -227,7 +243,7 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
               aria-label={`자료 연결 ${item.title}`}
               onClick={() => {
                 returnItem.current = item.id;
-                setPicker(item);
+                setPicker({ owner: item });
               }}
             >
               자료 연결
@@ -254,9 +270,9 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
                   </span>
                   <button
                     aria-label={`연결 해제 ${resource.title}`}
-                    onClick={() => {
+                    onClick={async () => {
                       try {
-                        commit(
+                        await commit(
                           unlinkResource(data.store, item.id, resource.id),
                         );
                       } catch {
@@ -337,7 +353,7 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
           <p className="storage-error" role="alert">
             {data.error}
             {!data.store && (
-              <button onClick={() => setData(read())}>다시 시도</button>
+              <button onClick={read}>다시 시도</button>
             )}
           </p>
         )}
@@ -529,10 +545,10 @@ export default function Workspace({ sampleTasks, sampleEvents }) {
             >
               <RelationChoices
                 store={data.store}
-                owner={picker}
-                onConnect={(taskId, resourceId) => {
-                  commit(linkResource(data.store, taskId, resourceId));
-                  setPicker(null);
+                owner={relationOwner}
+                onConnect={async (taskId, resourceId) => {
+                  await commit(linkResource(data.store, taskId, resourceId));
+                  closePicker(picker);
                 }}
                 onCancel={() => setPicker(null)}
               />

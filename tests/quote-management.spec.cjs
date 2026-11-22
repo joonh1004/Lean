@@ -53,6 +53,7 @@ test("editing assigned quote freezes today, removes exact-match badge and deleti
   await page.getByRole("button", { name: "삭제", exact: true }).click();
   await expect(page.locator(".quote-delete-copy")).toHaveText("수정된\n문구.");
   await page.getByRole("button", { name: "삭제 확인", exact: true }).click();
+  await expect(page.locator(".quote-row")).toHaveCount(1);
   expect((await stored(page)).quotes.map((q) => q.id)).toEqual(["b"]);
   expect((await stored(page)).days[day].text).toBe("오늘 원문.");
   await page.getByRole("button", { name: "문구 입력으로" }).click();
@@ -154,6 +155,7 @@ test("completed day stays complete after last deletion with accurate confirmatio
     ),
   ).toBeVisible();
   await page.getByRole("button", { name: "삭제 확인", exact: true }).click();
+  await expect(page.getByText("저장한 문구 없음", { exact: true })).toBeVisible();
   expect((await stored(page)).days[day].completed).toBe(true);
   await page.reload();
   await expect(
@@ -171,8 +173,8 @@ test("completion cannot overwrite storage corrupted after initial read", async (
   page,
 }) => {
   await open(page);
-  await page.evaluate((k) => localStorage.setItem(k, "{broken"), key);
   await page.getByRole("textbox", { name: "문구 입력" }).fill("오늘 원문.");
+  await page.evaluate((k) => localStorage.setItem(k, "{broken"), key);
   await page.getByRole("button", { name: "시작", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   expect(await page.evaluate((k) => localStorage.getItem(k), key)).toBe(
@@ -244,6 +246,7 @@ test("verification coverage: added quote participates in next pending days witho
     .getByRole("textbox", { name: "문구", exact: true })
     .fill("새 순환 문구.");
   await page.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(page.locator(".quote-row")).toHaveCount(3);
   const added = (await stored(page)).quotes.at(-1).id;
   await page.getByRole("button", { name: "문구 입력으로" }).click();
   await page.clock.fastForward(86400000);
@@ -271,6 +274,7 @@ test("gate management adds exact copy without authorizing workspace; completed s
     .getByRole("textbox", { name: "문구", exact: true })
     .fill("  새 문구\n두 번째 줄  ");
   await page.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(page.locator(".quote-row")).toHaveCount(3);
   expect((await stored(page)).quotes.at(-1).text).toBe(
     "  새 문구\n두 번째 줄  ",
   );

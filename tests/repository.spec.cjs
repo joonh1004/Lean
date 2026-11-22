@@ -54,6 +54,7 @@ test("denied relationship and folder writes retain originals and editable folder
   await page
     .getByRole("button", { name: "연결 할 일 보존할 공부 저장소", exact: true })
     .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   const before = await page.evaluate((k) => localStorage.getItem(k), key);
   await page.evaluate((k) => {
     window.realRecordSet = Storage.prototype.setItem;
@@ -115,6 +116,7 @@ test("task/event links and unlinking preserve sources; deleting source removes r
       .getByLabel("제목", { exact: true })
       .fill(label === "할 일" ? "연결할 공부" : "연결할 상담");
     await dialog.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
   }
   await repo(page);
   let dialog = await resource(page, "교재 메모", "연결해도 유지할 원문");
@@ -143,6 +145,7 @@ test("task/event links and unlinking preserve sources; deleting source removes r
   await page
     .getByRole("button", { name: "연결 해제 연결할 공부", exact: true })
     .click();
+  await expect(page.locator(".repo-relation")).toHaveCount(0);
   await expect(page.locator(".note-body")).toHaveText("연결해도 유지할 원문");
   await page
     .getByRole("navigation", { name: "주 메뉴" })
@@ -163,6 +166,7 @@ test("task/event links and unlinking preserve sources; deleting source removes r
   await page
     .getByRole("button", { name: "연결 해제 교재 메모", exact: true })
     .click();
+  await expect(page.getByRole("button", { name: "연결 해제 교재 메모", exact: true })).toHaveCount(0);
   let state = await page.evaluate(
     (k) => JSON.parse(localStorage.getItem(k)),
     key,
@@ -182,6 +186,7 @@ test("task/event links and unlinking preserve sources; deleting source removes r
   dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "삭제", exact: true }).click();
   await dialog.getByRole("button", { name: "삭제", exact: true }).click();
+  await expect(dialog.getByLabel("제목", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await repo(page);
   await page
@@ -201,6 +206,7 @@ test("task/event links and unlinking preserve sources; deleting source removes r
   dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "원본 삭제", exact: true }).click();
   await dialog.getByRole("button", { name: "원본 삭제", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   state = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)), key);
   expect(state.records).toHaveLength(1);
   expect(state.records[0].type).toBe("event");
@@ -216,6 +222,7 @@ test("repository note save failures preserve draft body and original bytes until
   await repo(page);
   let dialog = await resource(page, "원본 메모", "저장된 본문");
   await dialog.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   const before = await page.evaluate((k) => localStorage.getItem(k), key);
   await page.getByRole("button", { name: "기록 수정", exact: true }).click();
   dialog = page.getByRole("dialog");
@@ -241,6 +248,7 @@ test("repository note save failures preserve draft body and original bytes until
   });
   await page.evaluate(() => (Storage.prototype.setItem = window.originalSet));
   await dialog.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   await page.reload();
   await repo(page);
   await page
@@ -299,6 +307,7 @@ test("links reject executable schemes; selection stays local; explicit external 
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("제목", { exact: true }).fill("수정한 학습 링크");
   await dialog.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   await page.reload();
   await repo(page);
   await page
@@ -315,6 +324,7 @@ test("links reject executable schemes; selection stays local; explicit external 
     "할 일·일정은 유지",
   );
   await dialog.getByRole("button", { name: "원본 삭제", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   await page.reload();
   await repo(page);
   await expect(page.getByText("기록 없음", { exact: true })).toBeVisible();
@@ -337,6 +347,7 @@ test("deep folders, duplicate search paths, move and narrow detail remain naviga
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("폴더 이름", { exact: true }).fill(name);
     await dialog.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
     path += " / " + name;
   }
   await page.getByText("전체 경로", { exact: true }).click();
@@ -398,12 +409,14 @@ test("deep folders, duplicate search paths, move and narrow detail remain naviga
   dialog = page.getByRole("dialog", { name: "기록 수정", exact: true });
   await dialog.getByLabel("폴더", { exact: true }).selectOption("");
   await dialog.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "폴더 수정", exact: true }).click();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "폴더 삭제", exact: true })
     .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(
     await page.evaluate(
       (k) => JSON.parse(localStorage.getItem(k)).folders.length,
